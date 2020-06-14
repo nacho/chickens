@@ -32,7 +32,8 @@ static DateTime datetime_from_tardis(bool sunrise)
   DateTime now = rtc.now();
   byte today[6] = {0,};
 
-  today[tl_year] = now.year();
+  /* it is bytes so we cannot use the direct year which is over uint8 */
+  today[tl_year] = (now.year() - 2000);
   today[tl_month] = now.month();
   today[tl_day] = now.day();
   today[tl_hour] = now.hour();
