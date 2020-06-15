@@ -54,7 +54,7 @@ static bool time_to_sleep(void)
   DateTime sunset = datetime_from_tardis(false);
   TimeSpan range(RANGE * 60);
 
-  return ((now >= (sunset - range)) && (now < (sunset + range)));
+  return ((now >= sunset) && (now < (sunset + range)));
 }
 
 /* leave them a range for them to eat */
