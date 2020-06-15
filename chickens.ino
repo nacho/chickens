@@ -70,9 +70,9 @@ static bool time_to_wakeup(void)
 void loop(void)
 {
   if (time_to_sleep() || time_to_wakeup()) {
-    digitalWrite(relay, HIGH);
-  } else {
     digitalWrite(relay, LOW);
+  } else {
+    digitalWrite(relay, HIGH);
   }
 
   delay(1000);
