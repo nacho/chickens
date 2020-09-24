@@ -1,8 +1,10 @@
 #include <Wire.h>
 #include <RTClib.h>
 #include <TimeLord.h>
+#include <LiquidCrystal_I2C.h>
 
 RTC_DS3231 rtc;
+LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 
 float const LATITUDE = 42.42;
 float const LONGITUDE = -8.76;
@@ -20,6 +22,9 @@ void setup(void)
     /* FIXME: print an error in the serial? */
     while (1);
   }
+
+  lcd.init();
+  lcd.backlight();
 
   tardis.TimeZone(TIMEZONE);
   tardis.Position(LATITUDE, LONGITUDE);
@@ -67,8 +72,42 @@ static bool time_to_wakeup(void)
   return ((now >= sunrise) && (now < (sunrise + range)));
 }
 
+static void print_to_lcd(void)
+{
+  DateTime now = rtc.now();
+  DateTime sunrise = datetime_from_tardis(true);
+  DateTime sunset = datetime_from_tardis(false);
+
+  lcd.setCursor(0, 0);
+  lcd.print(now.day());
+  lcd.print("/");
+  lcd.print(now.month());
+  lcd.print("/");
+  lcd.print(now.year() - 2000);
+  lcd.print(" ");
+  lcd.print(now.hour());
+  lcd.print(":");
+  lcd.print(now.minute() < 10 ? "0" + String(now.minute()) : now.minute());
+  lcd.print(":");
+  lcd.print(now.second() < 10 ? "0" + String(now.second()) : now.second());
+
+  lcd.setCursor(0, 1);
+  lcd.print("R/");
+  lcd.print(sunrise.hour());
+  lcd.print(":");
+  lcd.print(sunrise.minute() < 10 ? "0" + String(sunrise.minute()) : sunrise.minute());
+
+  lcd.print(" ");
+  lcd.print("S/");
+  lcd.print(sunset.hour());
+  lcd.print(":");
+  lcd.print(sunset.minute() < 10 ? "0" + String(sunset.minute()) : sunset.minute());
+}
+
 void loop(void)
 {
+  print_to_lcd();
+
   if (time_to_sleep() || time_to_wakeup()) {
     digitalWrite(relay, LOW);
   } else {
