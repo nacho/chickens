@@ -4,7 +4,7 @@
 #include <LiquidCrystal_I2C.h>
 
 RTC_DS3231 rtc;
-LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 
 float const LATITUDE = 42.42;
 float const LONGITUDE = -8.76;
@@ -12,7 +12,8 @@ TimeLord tardis;
 int TIMEZONE = 2 * 60; /* gmt + 2 */
 
 /* pin that turns on the light */
-int relay = 12;
+int RELAY = 12;
+int LIGHT_OVERRIDE_SWITCH = 2;
 
 int RANGE = 30; /* in minutes */
 
@@ -29,7 +30,8 @@ void setup(void)
   tardis.TimeZone(TIMEZONE);
   tardis.Position(LATITUDE, LONGITUDE);
 
-  pinMode(relay, OUTPUT);
+  pinMode(RELAY, OUTPUT);
+  pinMode(LIGHT_OVERRIDE_SWITCH, INPUT);
 }
 
 static DateTime datetime_from_tardis(bool sunrise)
@@ -72,7 +74,7 @@ static bool time_to_wakeup(void)
   return ((now >= sunrise) && (now < (sunrise + range)));
 }
 
-static void print_to_lcd(void)
+static void print_to_lcd(bool light_override)
 {
   DateTime now = rtc.now();
   DateTime sunrise = datetime_from_tardis(true);
@@ -92,27 +94,38 @@ static void print_to_lcd(void)
   lcd.print(now.second() < 10 ? "0" + String(now.second()) : now.second());
 
   lcd.setCursor(0, 1);
-  lcd.print("R/");
-  lcd.print(sunrise.hour());
-  lcd.print(":");
-  lcd.print(sunrise.minute() < 10 ? "0" + String(sunrise.minute()) : sunrise.minute());
 
-  lcd.print(" ");
-  lcd.print("S/");
-  lcd.print(sunset.hour());
-  lcd.print(":");
-  lcd.print(sunset.minute() < 10 ? "0" + String(sunset.minute()) : sunset.minute());
+  /* Is it worth doing some caching to avoid printing all the time to the
+   * lcd device?
+   */
+  if (light_override) {
+    /* FIXME: kind of hacky adding all the spaces but oh well... */
+    lcd.print("Light override  ");
+  } else {
+    lcd.print("R/");
+    lcd.print(sunrise.hour());
+    lcd.print(":");
+    lcd.print(sunrise.minute() < 10 ? "0" + String(sunrise.minute()) : sunrise.minute());
+
+    lcd.print(" ");
+    lcd.print("S/");
+    lcd.print(sunset.hour());
+    lcd.print(":");
+    lcd.print(sunset.minute() < 10 ? "0" + String(sunset.minute()) : sunset.minute());
+  }
+}
+
+static void change_light_state(bool on)
+{
+  digitalWrite(RELAY, on ? LOW : HIGH);
 }
 
 void loop(void)
 {
-  print_to_lcd();
+  bool light_override = digitalRead(LIGHT_OVERRIDE_SWITCH) == HIGH;
 
-  if (time_to_sleep() || time_to_wakeup()) {
-    digitalWrite(relay, LOW);
-  } else {
-    digitalWrite(relay, HIGH);
-  }
+  print_to_lcd(light_override);
+  change_light_state(light_override || time_to_sleep() || time_to_wakeup());
 
   delay(1000);
 }
