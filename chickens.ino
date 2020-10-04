@@ -59,25 +59,25 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);  // set the LCD address to 0x27 for a 16 cha
 float const LATITUDE = 42.42;
 float const LONGITUDE = -8.76;
 TimeLord tardis;
-int TIMEZONE = 2 * 60; /* gmt + 2 */
+const int TIMEZONE = 2 * 60; /* gmt + 2 */
 
 /* pin that turns on the light */
-int LIGHT_RELAY = 12;
-int LIGHT_OVERRIDE_SWITCH = 2;
+const int LIGHT_RELAY = 12;
+const int LIGHT_OVERRIDE_SWITCH = 2;
 
 /* pins to handle the door */
-int DOOR_OPEN_RELAY1 = 11;
-int DOOR_OPEN_RELAY2 = 10;
-int DOOR_CLOSE_RELAY1 = 9;
-int DOOR_CLOSE_RELAY2 = 8;
-int DOOR_OVERRIDE_SWITCH = 3;
-int DOOR_SWITCH = 4;
+const int DOOR_OPEN_RELAY1 = 11;
+const int DOOR_OPEN_RELAY2 = 10;
+const int DOOR_CLOSE_RELAY1 = 9;
+const int DOOR_CLOSE_RELAY2 = 8;
+const int DOOR_OVERRIDE_SWITCH = 3;
+const int DOOR_SWITCH = 4;
 
 /* pins for door limit switches */
-int DOOR_OPEN_LIMIT_SWITCH = 5;
-int DOOR_CLOSE_LIMIT_SWITCH = 6;
+const int DOOR_OPEN_LIMIT_SWITCH = 5;
+const int DOOR_CLOSE_LIMIT_SWITCH = 6;
 
-int RANGE = 30; /* in minutes */
+const int RANGE = 30; /* in minutes */
 
 void setup(void)
 {
