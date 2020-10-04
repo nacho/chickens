@@ -35,6 +35,16 @@
  * - A switch button is used to override the RTC logic so the light is turned
  *   on while the switch is on. LIGHT_OVERRIDE_SWITCH is the pin to handle this
  *   switch.
+ *
+ * - Two relays are used to control when to start the engine to open the door,
+ *   this is configured in DOOR_OPEN_RELAY1 and DOOR_OPEN_RELAY2 pins and another
+ *   two DOOR_CLOSE_RELAY1 and DOOR_CLOSE_RELAY2 to control when to close it. Note
+ *   that so many are needed so we are able to switch the polarity that arrives
+ *   to the engine. TODO: maybe there is something better to do it?
+ *
+ * - A switch is used to override the RTC and to manually handle the door. This is configured
+ *   in the pin DOOR_OVERRIDE_SWITCH. Once this switch is on another switch configured in
+ *   DOOR_SWITCH is used to control whether to open or close the door.
  */
 
 
@@ -55,6 +65,18 @@ int TIMEZONE = 2 * 60; /* gmt + 2 */
 int LIGHT_RELAY = 12;
 int LIGHT_OVERRIDE_SWITCH = 2;
 
+/* pins to handle the door */
+int DOOR_OPEN_RELAY1 = 11;
+int DOOR_OPEN_RELAY2 = 10;
+int DOOR_CLOSE_RELAY1 = 9;
+int DOOR_CLOSE_RELAY2 = 8;
+int DOOR_OVERRIDE_SWITCH = 3;
+int DOOR_SWITCH = 4;
+
+/* pins for door limit switches */
+int DOOR_OPEN_LIMIT_SWITCH = 5;
+int DOOR_CLOSE_LIMIT_SWITCH = 6;
+
 int RANGE = 30; /* in minutes */
 
 void setup(void)
@@ -72,6 +94,14 @@ void setup(void)
 
   pinMode(LIGHT_RELAY, OUTPUT);
   pinMode(LIGHT_OVERRIDE_SWITCH, INPUT);
+  pinMode(DOOR_OVERRIDE_SWITCH, INPUT);
+  pinMode(DOOR_SWITCH, INPUT);
+  pinMode(DOOR_OPEN_RELAY1, OUTPUT);
+  pinMode(DOOR_OPEN_RELAY2, OUTPUT);
+  pinMode(DOOR_CLOSE_RELAY1, OUTPUT);
+  pinMode(DOOR_CLOSE_RELAY2, OUTPUT);
+  pinMode(DOOR_OPEN_LIMIT_SWITCH, INPUT);
+  pinMode(DOOR_CLOSE_LIMIT_SWITCH, INPUT);
 }
 
 static DateTime datetime_from_tardis(bool sunrise)
@@ -114,7 +144,8 @@ static bool time_to_wakeup(void)
   return ((now >= sunrise) && (now < (sunrise + range)));
 }
 
-static void print_to_lcd(bool light_override)
+static void print_to_lcd(bool light_override,
+                         bool door_override)
 {
   DateTime now = rtc.now();
   DateTime sunrise = datetime_from_tardis(true);
@@ -138,9 +169,15 @@ static void print_to_lcd(bool light_override)
   /* Is it worth doing some caching to avoid printing all the time to the
    * lcd device?
    */
-  if (light_override) {
+  if (light_override || door_override) {
     /* FIXME: kind of hacky adding all the spaces but oh well... */
-    lcd.print("Light override  ");
+    if (light_override && door_override) {
+      lcd.print("L/D override    ");
+    } else if (light_override) {
+      lcd.print("Light override  ");
+    } else {
+      lcd.print("Door override   ");
+    }
   } else {
     lcd.print("R/");
     lcd.print(sunrise.hour());
@@ -160,12 +197,48 @@ static void change_light_state(bool on)
   digitalWrite(LIGHT_RELAY, on ? LOW : HIGH);
 }
 
+static void handle_door(bool door_override,
+                        bool open_door,
+                        bool door_opened,
+                        bool door_closed)
+{
+  enum {
+    DOOR_STATE_NONE,
+    DOOR_STATE_OPENING,
+    DOOR_STATE_CLOSING
+  } door_state;
+
+  door_state = DOOR_STATE_NONE;
+
+  if (door_override) {
+    if (open_door && !door_opened) {
+      door_state = DOOR_STATE_OPENING;
+    } else if (!open_door && !door_closed) {
+      door_state = DOOR_STATE_CLOSING;
+    }
+  } else if (time_to_wakeup()) {
+    door_state = DOOR_STATE_OPENING;
+  } else if (time_to_sleep()) {
+    door_state = DOOR_STATE_CLOSING;
+  }
+
+  digitalWrite(DOOR_OPEN_RELAY1, (door_state == DOOR_STATE_OPENING && !door_opened) ? LOW : HIGH);
+  digitalWrite(DOOR_OPEN_RELAY2, (door_state == DOOR_STATE_OPENING && !door_opened) ? LOW : HIGH);
+  digitalWrite(DOOR_CLOSE_RELAY1, (door_state == DOOR_STATE_CLOSING && !door_closed) ? LOW : HIGH);
+  digitalWrite(DOOR_CLOSE_RELAY2, (door_state == DOOR_STATE_CLOSING && !door_closed) ? LOW : HIGH);
+}
+
 void loop(void)
 {
   bool light_override = digitalRead(LIGHT_OVERRIDE_SWITCH) == HIGH;
+  bool door_override = digitalRead(DOOR_OVERRIDE_SWITCH) == HIGH;
+  bool open_door = digitalRead(DOOR_SWITCH) == HIGH;
+  bool door_opened = digitalRead(DOOR_OPEN_LIMIT_SWITCH) == HIGH;
+  bool door_closed = digitalRead(DOOR_CLOSE_LIMIT_SWITCH) == HIGH;
 
-  print_to_lcd(light_override);
+  print_to_lcd(light_override, door_override);
   change_light_state(light_override || time_to_sleep() || time_to_wakeup());
+  handle_door(door_override, open_door, door_opened, door_closed);
 
   delay(1000);
 }
