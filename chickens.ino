@@ -124,26 +124,6 @@ static DateTime datetime_from_tardis(bool sunrise)
   return DateTime(today[tl_year], today[tl_month], today[tl_day], today[tl_hour], today[tl_minute], today[tl_second]);
 }
 
-/* gets whether we are in range to turn on the light for the chickens to sleep */
-static bool time_to_sleep(void)
-{
-  DateTime now = rtc.now();
-  DateTime sunset = datetime_from_tardis(false);
-  TimeSpan range(RANGE * 60);
-
-  return ((now >= sunset) && (now < (sunset + range)));
-}
-
-/* leave them a range for them to eat */
-static bool time_to_wakeup(void)
-{
-  DateTime now = rtc.now();
-  DateTime sunrise = datetime_from_tardis(true);
-  TimeSpan range(RANGE * 60);
-
-  return ((now >= sunrise) && (now < (sunrise + range)));
-}
-
 static void print_to_lcd(bool light_override,
                          bool door_override)
 {
@@ -192,8 +172,16 @@ static void print_to_lcd(bool light_override,
   }
 }
 
-static void change_light_state(bool on)
+static void change_light_state(bool light_override)
 {
+  DateTime now = rtc.now();
+  DateTime sunrise = datetime_from_tardis(true);
+  DateTime sunset = datetime_from_tardis(false);
+  TimeSpan range(RANGE * 60);
+  bool on = light_override ||
+            ((now >= sunset) && (now < (sunset + range))) ||
+            ((now >= sunrise) && (now < (sunrise + range)));
+
   digitalWrite(LIGHT_RELAY, on ? LOW : HIGH);
 }
 
@@ -202,6 +190,9 @@ static void handle_door(bool door_override,
                         bool door_opened,
                         bool door_closed)
 {
+  DateTime now = rtc.now();
+  DateTime sunrise = datetime_from_tardis(true);
+  DateTime sunset = datetime_from_tardis(false);
   enum {
     DOOR_STATE_NONE,
     DOOR_STATE_OPENING,
@@ -216,16 +207,16 @@ static void handle_door(bool door_override,
     } else if (!open_door && !door_closed) {
       door_state = DOOR_STATE_CLOSING;
     }
-  } else if (time_to_wakeup()) {
+  } else if (now >= sunrise && now <= sunset && !door_opened) {
     door_state = DOOR_STATE_OPENING;
-  } else if (time_to_sleep()) {
+  } else if (now >= sunset && !door_closed) {
     door_state = DOOR_STATE_CLOSING;
   }
 
-  digitalWrite(DOOR_OPEN_RELAY1, (door_state == DOOR_STATE_OPENING && !door_opened) ? LOW : HIGH);
-  digitalWrite(DOOR_OPEN_RELAY2, (door_state == DOOR_STATE_OPENING && !door_opened) ? LOW : HIGH);
-  digitalWrite(DOOR_CLOSE_RELAY1, (door_state == DOOR_STATE_CLOSING && !door_closed) ? LOW : HIGH);
-  digitalWrite(DOOR_CLOSE_RELAY2, (door_state == DOOR_STATE_CLOSING && !door_closed) ? LOW : HIGH);
+  digitalWrite(DOOR_OPEN_RELAY1, (door_state == DOOR_STATE_OPENING) ? LOW : HIGH);
+  digitalWrite(DOOR_OPEN_RELAY2, (door_state == DOOR_STATE_OPENING) ? LOW : HIGH);
+  digitalWrite(DOOR_CLOSE_RELAY1, (door_state == DOOR_STATE_CLOSING) ? LOW : HIGH);
+  digitalWrite(DOOR_CLOSE_RELAY2, (door_state == DOOR_STATE_CLOSING) ? LOW : HIGH);
 }
 
 void loop(void)
@@ -237,7 +228,7 @@ void loop(void)
   bool door_closed = digitalRead(DOOR_CLOSE_LIMIT_SWITCH) == HIGH;
 
   print_to_lcd(light_override, door_override);
-  change_light_state(light_override || time_to_sleep() || time_to_wakeup());
+  change_light_state(light_override);
   handle_door(door_override, open_door, door_opened, door_closed);
 
   delay(1000);
