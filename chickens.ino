@@ -12,7 +12,7 @@ TimeLord tardis;
 int TIMEZONE = 2 * 60; /* gmt + 2 */
 
 /* pin that turns on the light */
-int RELAY = 12;
+int LIGHT_RELAY = 12;
 int LIGHT_OVERRIDE_SWITCH = 2;
 
 int RANGE = 30; /* in minutes */
@@ -30,7 +30,7 @@ void setup(void)
   tardis.TimeZone(TIMEZONE);
   tardis.Position(LATITUDE, LONGITUDE);
 
-  pinMode(RELAY, OUTPUT);
+  pinMode(LIGHT_RELAY, OUTPUT);
   pinMode(LIGHT_OVERRIDE_SWITCH, INPUT);
 }
 
@@ -117,7 +117,7 @@ static void print_to_lcd(bool light_override)
 
 static void change_light_state(bool on)
 {
-  digitalWrite(RELAY, on ? LOW : HIGH);
+  digitalWrite(LIGHT_RELAY, on ? LOW : HIGH);
 }
 
 void loop(void)
