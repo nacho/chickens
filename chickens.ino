@@ -15,6 +15,28 @@
  * along with Ths program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * Small arduino program that allows to handle my requirements for my chickens:
+ *
+ * - Detects with an RTC when the sunrise and sunset happen. For this there are
+ *   two variables LATITUDE and LONGITUDE that must be set to your coordinates.
+ *
+ * - Turns on the light right after sunrise so the chickens can have some light
+ *   to eat if they wish since at that moment there is still not enough light
+ *   for them to properly watch where they sleep. For this the RANGE variable
+ *   is used for the amount of time that will be turned on after sunrise.
+ *
+ * - Turns on the light when the sunset is going to happen. Also RANGE is used
+ *   to decide when it is going to happen. Currently this is done as
+ *   (-RANGE, SUNSET, RANGE).
+ *
+ * - The pin to handle the relay for the light is set in LIGHT_RELAY.
+ *
+ * - A switch button is used to override the RTC logic so the light is turned
+ *   on while the switch is on. LIGHT_OVERRIDE_SWITCH is the pin to handle this
+ *   switch.
+ */
+
 
 #include <Wire.h>
 #include <RTClib.h>
