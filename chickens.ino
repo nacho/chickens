@@ -81,6 +81,10 @@ void setup(void)
     while (1);
   }
 
+  if (rtc.lostPower()) {
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
+
   lcd.init();
   lcd.backlight();
 
