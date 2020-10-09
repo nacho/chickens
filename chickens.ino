@@ -36,11 +36,8 @@
  *   on while the switch is on. LIGHT_OVERRIDE_SWITCH is the pin to handle this
  *   switch.
  *
- * - Two relays are used to control when to start the engine to open the door,
- *   this is configured in DOOR_OPEN_RELAY1 and DOOR_OPEN_RELAY2 pins and another
- *   two DOOR_CLOSE_RELAY1 and DOOR_CLOSE_RELAY2 to control when to close it. Note
- *   that so many are needed so we are able to switch the polarity that arrives
- *   to the engine. TODO: maybe there is something better to do it?
+ * - To control the door a L298N driver is used. And the pins L298N_IN1 and L298N_IN2
+ *   are used to handle it.
  *
  * - A switch is used to override the RTC and to manually handle the door. This is configured
  *   in the pin DOOR_OVERRIDE_SWITCH. Once this switch is on another switch configured in
@@ -66,16 +63,14 @@ const int LIGHT_RELAY = 12;
 const int LIGHT_OVERRIDE_SWITCH = 2;
 
 /* pins to handle the door */
-const int DOOR_OPEN_RELAY1 = 11;
-const int DOOR_OPEN_RELAY2 = 10;
-const int DOOR_CLOSE_RELAY1 = 9;
-const int DOOR_CLOSE_RELAY2 = 8;
 const int DOOR_OVERRIDE_SWITCH = 3;
 const int DOOR_SWITCH = 4;
+const int L298N_IN1 = 5;
+const int L298N_IN2 = 6;
 
 /* pins for door limit switches */
-const int DOOR_OPEN_LIMIT_SWITCH = 5;
-const int DOOR_CLOSE_LIMIT_SWITCH = 6;
+const int DOOR_OPEN_LIMIT_SWITCH = 7;
+const int DOOR_CLOSE_LIMIT_SWITCH = 8;
 
 const int RANGE = 30; /* in minutes */
 
@@ -96,10 +91,8 @@ void setup(void)
   pinMode(LIGHT_OVERRIDE_SWITCH, INPUT);
   pinMode(DOOR_OVERRIDE_SWITCH, INPUT);
   pinMode(DOOR_SWITCH, INPUT);
-  pinMode(DOOR_OPEN_RELAY1, OUTPUT);
-  pinMode(DOOR_OPEN_RELAY2, OUTPUT);
-  pinMode(DOOR_CLOSE_RELAY1, OUTPUT);
-  pinMode(DOOR_CLOSE_RELAY2, OUTPUT);
+  pinMode(L298N_IN1, OUTPUT);
+  pinMode(L298N_IN2, OUTPUT);
   pinMode(DOOR_OPEN_LIMIT_SWITCH, INPUT);
   pinMode(DOOR_CLOSE_LIMIT_SWITCH, INPUT);
 }
@@ -213,10 +206,16 @@ static void handle_door(bool door_override,
     door_state = DOOR_STATE_CLOSING;
   }
 
-  digitalWrite(DOOR_OPEN_RELAY1, (door_state == DOOR_STATE_OPENING) ? LOW : HIGH);
-  digitalWrite(DOOR_OPEN_RELAY2, (door_state == DOOR_STATE_OPENING) ? LOW : HIGH);
-  digitalWrite(DOOR_CLOSE_RELAY1, (door_state == DOOR_STATE_CLOSING) ? LOW : HIGH);
-  digitalWrite(DOOR_CLOSE_RELAY2, (door_state == DOOR_STATE_CLOSING) ? LOW : HIGH);
+  if (door_state == DOOR_STATE_OPENING) {
+    digitalWrite(L298N_IN1, HIGH);
+    digitalWrite(L298N_IN2, LOW);
+  } else if (door_state == DOOR_STATE_CLOSING) {
+    digitalWrite(L298N_IN1, LOW);
+    digitalWrite(L298N_IN2, HIGH);
+  } else {
+    digitalWrite(L298N_IN1, LOW);
+    digitalWrite(L298N_IN2, LOW);
+  }
 }
 
 void loop(void)
