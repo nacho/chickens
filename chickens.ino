@@ -138,8 +138,6 @@ static void print_to_lcd(bool light_override,
   lcd.print(now.hour());
   lcd.print(":");
   lcd.print(now.minute() < 10 ? "0" + String(now.minute()) : now.minute());
-  lcd.print(":");
-  lcd.print(now.second() < 10 ? "0" + String(now.second()) : now.second());
 
   lcd.setCursor(0, 1);
 
