@@ -56,7 +56,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);  // set the LCD address to 0x27 for a 16 cha
 float const LATITUDE = 42.42;
 float const LONGITUDE = -8.76;
 TimeLord tardis;
-const int TIMEZONE = 2 * 60; /* gmt + 2 */
+const int TIMEZONE = 1 * 60; /* gmt + 1  */
 
 /* pin that turns on the light */
 const int LIGHT_RELAY = 12;
