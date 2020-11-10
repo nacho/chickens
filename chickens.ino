@@ -218,10 +218,14 @@ static void handle_door(bool open_door,
 
   door_state = DOOR_STATE_NONE;
 
-  if (open_door && !door_opened) {
-    door_state = DOOR_STATE_OPENING;
-  } else if (close_door && !door_closed) {
-    door_state = DOOR_STATE_CLOSING;
+  if (open_door) {
+    if (!door_opened) {
+      door_state = DOOR_STATE_OPENING;
+    }
+  } else if (close_door) {
+    if (!door_closed) {
+      door_state = DOOR_STATE_CLOSING;
+    }
   } else if (now >= sunrise && now <= sunset && !door_opened) {
     door_state = DOOR_STATE_OPENING;
   } else if (now >= sunset && !door_closed) {
