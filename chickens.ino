@@ -216,7 +216,7 @@ static void handle_door(bool open_door,
   DateTime now = rtc.now();
   DateTime sunrise = datetime_from_tardis(true);
   DateTime sunset = datetime_from_tardis(false);
-  TimeSpan range(RANGE * 60);
+  TimeSpan range(max(0, RANGE - 1) * 60);
   enum {
     DOOR_STATE_NONE,
     DOOR_STATE_OPENING,
