@@ -202,6 +202,12 @@ static void change_light_state(bool light_on,
   digitalWrite(LIGHT_RELAY, on ? LOW : HIGH);
 }
 
+/* Handles the state of the door and opens the door or closes it depending
+ * of the different inputs.
+ * Note that when opening/closing the door we wait for a RANGE since it can
+ * be still slightly dark or slighly lightly and the chickens might be still
+ * outside or insecure to leave the coop.
+ */
 static void handle_door(bool open_door,
                         bool close_door,
                         bool door_opened,
@@ -210,6 +216,7 @@ static void handle_door(bool open_door,
   DateTime now = rtc.now();
   DateTime sunrise = datetime_from_tardis(true);
   DateTime sunset = datetime_from_tardis(false);
+  TimeSpan range(RANGE * 60);
   enum {
     DOOR_STATE_NONE,
     DOOR_STATE_OPENING,
@@ -226,9 +233,9 @@ static void handle_door(bool open_door,
     if (!door_closed) {
       door_state = DOOR_STATE_CLOSING;
     }
-  } else if (now >= sunrise && now <= sunset && !door_opened) {
+  } else if (now >= (sunrise + range) && now < (sunset + range) && !door_opened) {
     door_state = DOOR_STATE_OPENING;
-  } else if (now >= sunset && !door_closed) {
+  } else if (now >= (sunset + range) && !door_closed) {
     door_state = DOOR_STATE_CLOSING;
   }
 
