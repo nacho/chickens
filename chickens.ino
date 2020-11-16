@@ -58,19 +58,21 @@ TimeLord tardis;
 const int TIMEZONE = 1 * 60; /* gmt + 1  */
 
 /* pin that turns on the light */
-const int LIGHT_RELAY = 12;
+const int LIGHT_RELAY = 10;
 const int LIGHT_ON_SWITCH = 2;
 const int LIGHT_OFF_SWITCH = 3;
 
 /* pins to handle the door */
 const int OPEN_DOOR_SWITCH = 4;
 const int CLOSE_DOOR_SWITCH = 5;
-const int L298N_IN1 = 6;
-const int L298N_IN2 = 7;
 
 /* pins for door limit switches */
-const int DOOR_OPEN_LIMIT_SWITCH = 8;
-const int DOOR_CLOSE_LIMIT_SWITCH = 9;
+const int DOOR_OPEN_LIMIT_SWITCH = 6;
+const int DOOR_CLOSE_LIMIT_SWITCH = 7;
+
+/* L298N for the door */
+const int L298N_IN1 = 8;
+const int L298N_IN2 = 9;
 
 const int RANGE = 30; /* in minutes */
 
