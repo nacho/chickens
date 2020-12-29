@@ -27,8 +27,11 @@
  *   is used for the amount of time that will be turned on after sunrise.
  *
  * - Turns on the light when the sunset is going to happen. Also RANGE is used
- *   to decide when it is going to happen. Currently this is done as
- *   (-RANGE, SUNSET, RANGE).
+ *   to decide when it is going to happen. But in this case also STEP_DELAY,
+ *   since we want to wait for an amount of time after sunrise to turn on the light.
+ *   This is due to the fact that after sunrise normally there is still a bit of light
+ *   and the chickens are outside till the last second. Currently this is done as
+ *   (SUNSET + STEP_DELAY, RANGE).
  *
  * - The pin to handle the relay for the light is set in LIGHT_RELAY.
  *
@@ -74,6 +77,7 @@ const int DOOR_CLOSE_LIMIT_SWITCH = 7;
 const int L298N_IN1 = 8;
 const int L298N_IN2 = 9;
 
+const int STEP_DELAY = 10; /* in minutes */
 const int RANGE = 30; /* in minutes */
 
 void setup(void)
@@ -127,7 +131,9 @@ static DateTime datetime_from_tardis(bool sunrise)
 static void print_to_lcd(bool light_on,
                          bool light_off,
                          bool open_door,
-                         bool close_door)
+                         bool door_opened,
+                         bool close_door,
+                         bool door_closed)
 {
   DateTime now = rtc.now();
   DateTime sunrise = datetime_from_tardis(true);
@@ -170,9 +176,19 @@ static void print_to_lcd(bool light_on,
         lcd.print("Light OFF       ");
       }
     } else if (open_door) {
-      lcd.print("Door Open       ");
+      lcd.print("Door Open");
+      if (door_opened) {
+        lcd.print("/opened");
+      } else {
+        lcd.print("       ");
+      }
     } else {
-      lcd.print("Door Close      ");
+      lcd.print("Door Close");
+      if (door_closed) {
+        lcd.print("/closed");
+      } else {
+        lcd.print("      ");
+      }
     }
   } else {
     lcd.print("R/");
@@ -194,9 +210,10 @@ static void change_light_state(bool light_on,
   DateTime now = rtc.now();
   DateTime sunrise = datetime_from_tardis(true);
   DateTime sunset = datetime_from_tardis(false);
+  TimeSpan step_delay(STEP_DELAY * 60);
   TimeSpan range(RANGE * 60);
   bool on = light_on ||
-            ((now >= sunset) && (now < (sunset + range))) ||
+            ((now >= (sunset + step_delay)) && (now < (sunset + step_delay + range))) ||
             ((now >= sunrise) && (now < (sunrise + range)));
 
   on &= !light_off;
@@ -206,9 +223,9 @@ static void change_light_state(bool light_on,
 
 /* Handles the state of the door and opens the door or closes it depending
  * of the different inputs.
- * Note that when opening/closing the door we wait for a RANGE since it can
- * be still slightly dark or slighly lightly and the chickens might be still
- * outside or insecure to leave the coop.
+ * Note that when opening/closing the door we wait for a RANGE and the STEP_DELAY
+ * since it can be still slightly dark or slighly lightly and the chickens might
+ * be still outside or insecure to leave the coop.
  */
 static void handle_door(bool open_door,
                         bool close_door,
@@ -218,6 +235,7 @@ static void handle_door(bool open_door,
   DateTime now = rtc.now();
   DateTime sunrise = datetime_from_tardis(true);
   DateTime sunset = datetime_from_tardis(false);
+  TimeSpan step_delay(STEP_DELAY * 60);
   TimeSpan range(max(0, RANGE - 1) * 60);
   enum {
     DOOR_STATE_NONE,
@@ -235,9 +253,9 @@ static void handle_door(bool open_door,
     if (!door_closed) {
       door_state = DOOR_STATE_CLOSING;
     }
-  } else if (now >= (sunrise + range) && now < (sunset + range) && !door_opened) {
+  } else if (now >= (sunrise + step_delay) && now < (sunset + step_delay + range) && !door_opened) {
     door_state = DOOR_STATE_OPENING;
-  } else if (now >= (sunset + range) && !door_closed) {
+  } else if (now >= (sunset + step_delay + range) && !door_closed) {
     door_state = DOOR_STATE_CLOSING;
   }
 
@@ -262,7 +280,7 @@ void loop(void)
   bool door_opened = digitalRead(DOOR_OPEN_LIMIT_SWITCH) == HIGH;
   bool door_closed = digitalRead(DOOR_CLOSE_LIMIT_SWITCH) == HIGH;
 
-  print_to_lcd(light_on, light_off, open_door, close_door);
+  print_to_lcd(light_on, light_off, open_door, door_opened, close_door, door_closed);
   change_light_state(light_on, light_off);
   handle_door(open_door, close_door, door_opened, door_closed);
 
