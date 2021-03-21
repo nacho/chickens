@@ -48,17 +48,9 @@
 
 
 #include <Wire.h>
-#include <RTClib.h>
-#include <TimeLord.h>
 #include <LiquidCrystal_I2C.h>
 
-RTC_DS3231 rtc;
 LiquidCrystal_I2C lcd(0x27, 16, 2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
-
-float const LATITUDE = 42.42;
-float const LONGITUDE = -8.76;
-TimeLord tardis;
-const int TIMEZONE = 1 * 60; /* gmt + 1  */
 
 /* pin that turns on the light */
 const int LIGHT_RELAY = 10;
@@ -77,20 +69,8 @@ const int DOOR_CLOSE_LIMIT_SWITCH = 7;
 const int L298N_IN1 = 8;
 const int L298N_IN2 = 9;
 
-const int STEP_DELAY = 10; /* in minutes */
-const int RANGE = 30; /* in minutes */
-
 void setup(void)
 {
-  if (!rtc.begin()) {
-    /* FIXME: print an error in the serial? */
-    while (1);
-  }
-
-  if (rtc.lostPower()) {
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  }
-
   lcd.init();
   lcd.backlight();
 
@@ -108,26 +88,6 @@ void setup(void)
   pinMode(DOOR_CLOSE_LIMIT_SWITCH, INPUT);
 }
 
-static DateTime datetime_from_tardis(bool sunrise)
-{
-  DateTime now = rtc.now();
-  byte today[6] = {0,};
-
-  /* it is bytes so we cannot use the direct year which is over uint8 */
-  today[tl_year] = (now.year() - 2000);
-  today[tl_month] = now.month();
-  today[tl_day] = now.day();
-  today[tl_hour] = now.hour();
-
-  if (sunrise) {
-    tardis.SunRise(today);
-  } else {
-    tardis.SunSet(today);
-  }
-
-  return DateTime(today[tl_year], today[tl_month], today[tl_day], today[tl_hour], today[tl_minute], today[tl_second]);
-}
-
 static void print_to_lcd(bool light_on,
                          bool light_off,
                          bool open_door,
@@ -135,25 +95,6 @@ static void print_to_lcd(bool light_on,
                          bool close_door,
                          bool door_closed)
 {
-  DateTime now = rtc.now();
-  DateTime sunrise = datetime_from_tardis(true);
-  DateTime sunset = datetime_from_tardis(false);
-
-  lcd.setCursor(0, 0);
-  lcd.print(now.day());
-  lcd.print("/");
-  lcd.print(now.month());
-  lcd.print("/");
-  lcd.print(now.year() - 2000);
-  lcd.print(" ");
-  lcd.print(now.hour());
-  lcd.print(":");
-  lcd.print(now.minute() < 10 ? "0" + String(now.minute()) : now.minute());
-  /* Cleanup any leftovers */
-  lcd.print("  ");
-
-  lcd.setCursor(0, 1);
-
   /* Is it worth doing some caching to avoid printing all the time to the
    * lcd device?
    */
@@ -190,28 +131,12 @@ static void print_to_lcd(bool light_on,
         lcd.print("      ");
       }
     }
-  } else {
-    lcd.print("R/");
-    lcd.print(sunrise.hour());
-    lcd.print(":");
-    lcd.print(sunrise.minute() < 10 ? "0" + String(sunrise.minute()) : sunrise.minute());
-
-    lcd.print(" ");
-    lcd.print("S/");
-    lcd.print(sunset.hour());
-    lcd.print(":");
-    lcd.print(sunset.minute() < 10 ? "0" + String(sunset.minute()) : sunset.minute());
   }
 }
 
 static void change_light_state(bool light_on,
                                bool light_off)
 {
-  DateTime now = rtc.now();
-  DateTime sunrise = datetime_from_tardis(true);
-  DateTime sunset = datetime_from_tardis(false);
-  TimeSpan step_delay(STEP_DELAY * 60);
-  TimeSpan range(RANGE * 60);
   bool on = light_on ||
             ((now >= (sunset + step_delay)) && (now < (sunset + step_delay + range))) ||
             ((now >= sunrise) && (now < (sunrise + range)));
@@ -232,11 +157,6 @@ static void handle_door(bool open_door,
                         bool door_opened,
                         bool door_closed)
 {
-  DateTime now = rtc.now();
-  DateTime sunrise = datetime_from_tardis(true);
-  DateTime sunset = datetime_from_tardis(false);
-  TimeSpan step_delay(STEP_DELAY * 60);
-  TimeSpan range(max(0, RANGE - 1) * 60);
   enum {
     DOOR_STATE_NONE,
     DOOR_STATE_OPENING,
