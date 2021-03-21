@@ -64,6 +64,7 @@ const int TIMEZONE = 1 * 60; /* gmt + 1  */
 const int LIGHT_RELAY = 10;
 const int LIGHT_ON_SWITCH = 2;
 const int LIGHT_OFF_SWITCH = 3;
+const int PHOTO_RESISTOR = A0;
 
 /* pins to handle the door */
 const int OPEN_DOOR_SWITCH = 4;
@@ -130,6 +131,7 @@ static DateTime datetime_from_tardis(bool sunrise)
 
 static void print_to_lcd(bool light_on,
                          bool light_off,
+                         int  light_value,
                          bool open_door,
                          bool door_opened,
                          bool close_door,
@@ -191,7 +193,9 @@ static void print_to_lcd(bool light_on,
       }
     }
   } else {
-    lcd.print("R/");
+    lcd.print(light_value);
+
+    lcd.print(" R/");
     lcd.print(sunrise.hour());
     lcd.print(":");
     lcd.print(sunrise.minute() < 10 ? "0" + String(sunrise.minute()) : sunrise.minute());
@@ -275,12 +279,13 @@ void loop(void)
 {
   bool light_on = digitalRead(LIGHT_ON_SWITCH) == HIGH;
   bool light_off = digitalRead(LIGHT_OFF_SWITCH) == HIGH;
+  int light_value = analogRead(PHOTO_RESISTOR);
   bool open_door = digitalRead(OPEN_DOOR_SWITCH) == HIGH;
   bool close_door = digitalRead(CLOSE_DOOR_SWITCH) == HIGH;
   bool door_opened = digitalRead(DOOR_OPEN_LIMIT_SWITCH) == HIGH;
   bool door_closed = digitalRead(DOOR_CLOSE_LIMIT_SWITCH) == HIGH;
 
-  print_to_lcd(light_on, light_off, open_door, door_opened, close_door, door_closed);
+  print_to_lcd(light_on, light_off, light_value, open_door, door_opened, close_door, door_closed);
   change_light_state(light_on, light_off);
   handle_door(open_door, close_door, door_opened, door_closed);
 
