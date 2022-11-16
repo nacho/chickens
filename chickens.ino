@@ -77,6 +77,9 @@ const int DOOR_CLOSE_LIMIT_SWITCH = 7;
 const int L298N_IN1 = 8;
 const int L298N_IN2 = 9;
 
+/* Light resistor */
+const int LDR_SENSOR = A0;
+
 const int STEP_DELAY = 10; /* in minutes */
 const int RANGE = 30; /* in minutes */
 
@@ -133,7 +136,8 @@ static void print_to_lcd(bool light_on,
                          bool open_door,
                          bool door_opened,
                          bool close_door,
-                         bool door_closed)
+                         bool door_closed,
+                         int  ldr_value)
 {
   DateTime now = rtc.now();
   DateTime sunrise = datetime_from_tardis(true);
@@ -191,6 +195,9 @@ static void print_to_lcd(bool light_on,
       }
     }
   } else {
+    lcd.print("LDR: ");
+    lcd.print(ldr_value);
+
     lcd.print("R/");
     lcd.print(sunrise.hour());
     lcd.print(":");
@@ -279,8 +286,9 @@ void loop(void)
   bool close_door = digitalRead(CLOSE_DOOR_SWITCH) == HIGH;
   bool door_opened = digitalRead(DOOR_OPEN_LIMIT_SWITCH) == HIGH;
   bool door_closed = digitalRead(DOOR_CLOSE_LIMIT_SWITCH) == HIGH;
+  int ldr_value = analogRead(LDR_SENSOR);
 
-  print_to_lcd(light_on, light_off, open_door, door_opened, close_door, door_closed);
+  print_to_lcd(light_on, light_off, open_door, door_opened, close_door, door_closed, ldr_value);
   change_light_state(light_on, light_off);
   handle_door(open_door, close_door, door_opened, door_closed);
 
