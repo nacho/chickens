@@ -55,11 +55,6 @@
 RTC_DS3231 rtc;
 LiquidCrystal_I2C lcd(0x27, 16, 2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 
-float const LATITUDE = 42.42;
-float const LONGITUDE = -8.76;
-TimeLord tardis;
-const int TIMEZONE = 1 * 60; /* gmt + 1  */
-
 /* pin that turns on the light */
 const int LIGHT_RELAY = 10;
 const int LIGHT_ON_SWITCH = 2;
@@ -79,6 +74,9 @@ const int L298N_IN2 = 9;
 
 /* Light resistor */
 const int LDR_SENSOR = A0;
+const int LDR_THRESHOLD = 100; // FIXME
+DateTime timeout_start;
+bool timeout_started = false;
 
 const int STEP_DELAY = 10; /* in minutes */
 const int RANGE = 30; /* in minutes */
@@ -97,9 +95,6 @@ void setup(void)
   lcd.init();
   lcd.backlight();
 
-  tardis.TimeZone(TIMEZONE);
-  tardis.Position(LATITUDE, LONGITUDE);
-
   pinMode(LIGHT_RELAY, OUTPUT);
   pinMode(LIGHT_ON_SWITCH, INPUT);
   pinMode(LIGHT_OFF_SWITCH, INPUT);
@@ -111,26 +106,6 @@ void setup(void)
   pinMode(DOOR_CLOSE_LIMIT_SWITCH, INPUT);
 }
 
-static DateTime datetime_from_tardis(bool sunrise)
-{
-  DateTime now = rtc.now();
-  byte today[6] = {0,};
-
-  /* it is bytes so we cannot use the direct year which is over uint8 */
-  today[tl_year] = (now.year() - 2000);
-  today[tl_month] = now.month();
-  today[tl_day] = now.day();
-  today[tl_hour] = now.hour();
-
-  if (sunrise) {
-    tardis.SunRise(today);
-  } else {
-    tardis.SunSet(today);
-  }
-
-  return DateTime(today[tl_year], today[tl_month], today[tl_day], today[tl_hour], today[tl_minute], today[tl_second]);
-}
-
 static void print_to_lcd(bool light_on,
                          bool light_off,
                          bool open_door,
@@ -140,8 +115,6 @@ static void print_to_lcd(bool light_on,
                          int  ldr_value)
 {
   DateTime now = rtc.now();
-  DateTime sunrise = datetime_from_tardis(true);
-  DateTime sunset = datetime_from_tardis(false);
 
   lcd.setCursor(0, 0);
   lcd.print(now.day());
@@ -197,17 +170,6 @@ static void print_to_lcd(bool light_on,
   } else {
     lcd.print("LDR: ");
     lcd.print(ldr_value);
-
-    lcd.print("R/");
-    lcd.print(sunrise.hour());
-    lcd.print(":");
-    lcd.print(sunrise.minute() < 10 ? "0" + String(sunrise.minute()) : sunrise.minute());
-
-    lcd.print(" ");
-    lcd.print("S/");
-    lcd.print(sunset.hour());
-    lcd.print(":");
-    lcd.print(sunset.minute() < 10 ? "0" + String(sunset.minute()) : sunset.minute());
   }
 }
 
@@ -215,13 +177,10 @@ static void change_light_state(bool light_on,
                                bool light_off)
 {
   DateTime now = rtc.now();
-  DateTime sunrise = datetime_from_tardis(true);
-  DateTime sunset = datetime_from_tardis(false);
   TimeSpan step_delay(STEP_DELAY * 60);
   TimeSpan range(RANGE * 60);
   bool on = light_on ||
-            ((now >= (sunset + step_delay)) && (now < (sunset + step_delay + range))) ||
-            ((now >= sunrise) && (now < (sunrise + range)));
+            ((now >= (timeout_start + step_delay)) && (now < (timeout_start + step_delay + range)));
 
   on &= !light_off;
 
@@ -240,8 +199,6 @@ static void handle_door(bool open_door,
                         bool door_closed)
 {
   DateTime now = rtc.now();
-  DateTime sunrise = datetime_from_tardis(true);
-  DateTime sunset = datetime_from_tardis(false);
   TimeSpan step_delay(STEP_DELAY * 60);
   TimeSpan range(max(0, RANGE - 1) * 60);
   enum {
@@ -260,9 +217,14 @@ static void handle_door(bool open_door,
     if (!door_closed) {
       door_state = DOOR_STATE_CLOSING;
     }
-  } else if (now >= (sunrise + step_delay) && now < (sunset + step_delay + range) && !door_opened) {
+  } else if ((ldr_value > LDR_THRESHOLD) &&
+             (now >= (timeout_start + step_delay)) &&
+             (now < (timeout_start + step_delay + range)) &&
+             !door_opened) {
     door_state = DOOR_STATE_OPENING;
-  } else if (now >= (sunset + step_delay + range) && !door_closed) {
+  } else if ((ldr_value < LDR_THRESHOLD) &&
+             (now >= (timeout_start + step_delay + range)) &&
+             !door_closed) {
     door_state = DOOR_STATE_CLOSING;
   }
 
@@ -288,9 +250,16 @@ void loop(void)
   bool door_closed = digitalRead(DOOR_CLOSE_LIMIT_SWITCH) == HIGH;
   int ldr_value = analogRead(LDR_SENSOR);
 
+  if (door_closed || door_opened) {
+    timeout_started = false;
+  } else if (!timeout_started) {
+    timeout_started = true;
+    timeout_start = rtc.now();
+  }
+
   print_to_lcd(light_on, light_off, open_door, door_opened, close_door, door_closed, ldr_value);
   change_light_state(light_on, light_off);
-  handle_door(open_door, close_door, door_opened, door_closed);
+  handle_door(open_door, close_door, door_opened, door_closed, ldr_value);
 
   delay(1000);
 }
