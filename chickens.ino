@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 - Ignacio Casal Quinteiro
+ * Copyright (C) 2020-2022 - Ignacio Casal Quinteiro
  *
  * Ths program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -11,7 +11,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU General- Public License
  * along with Ths program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -74,9 +74,9 @@ const int L298N_IN2 = 9;
 
 /* Light resistor */
 const int LDR_SENSOR = A0;
-const int LDR_THRESHOLD = 100; // FIXME
-DateTime timeout_start;
-bool timeout_started = false;
+const int LDR_THRESHOLD = 20;
+DateTime timer;
+bool timer_started = false;
 
 const int STEP_DELAY = 10; /* in minutes */
 const int RANGE = 30; /* in minutes */
@@ -114,22 +114,7 @@ static void print_to_lcd(bool light_on,
                          bool door_closed,
                          int  ldr_value)
 {
-  DateTime now = rtc.now();
-
   lcd.setCursor(0, 0);
-  lcd.print(now.day());
-  lcd.print("/");
-  lcd.print(now.month());
-  lcd.print("/");
-  lcd.print(now.year() - 2000);
-  lcd.print(" ");
-  lcd.print(now.hour());
-  lcd.print(":");
-  lcd.print(now.minute() < 10 ? "0" + String(now.minute()) : now.minute());
-  /* Cleanup any leftovers */
-  lcd.print("  ");
-
-  lcd.setCursor(0, 1);
 
   /* Is it worth doing some caching to avoid printing all the time to the
    * lcd device?
@@ -140,15 +125,15 @@ static void print_to_lcd(bool light_on,
       if (open_door) {
         lcd.print("L ON/D Open     ");
       } else if (close_door) {
-        lcd.print("L ON/D Close     ");
+        lcd.print("L ON/D Close    ");
       } else {
         lcd.print("Light ON        ");
       }
     } else if (light_off) {
       if (open_door) {
-        lcd.print("L OFF/D Open     ");
+        lcd.print("L OFF/D Open    ");
       } else if (close_door) {
-        lcd.print("L OFF/D Close     ");
+        lcd.print("L OFF/D Close   ");
       } else {
         lcd.print("Light OFF       ");
       }
@@ -168,8 +153,28 @@ static void print_to_lcd(bool light_on,
       }
     }
   } else {
-    lcd.print("LDR: ");
-    lcd.print(ldr_value);
+    lcd.print("                ");
+  }
+
+  lcd.setCursor(0, 1);
+
+  lcd.print("LDR: ");
+  lcd.print(ldr_value);
+
+  if (timer_started) {
+    TimeSpan step_delay(STEP_DELAY * 60);
+    TimeSpan range(RANGE * 60);
+    int timer_min = rtc.now().minute() - timer.minute();
+    DateTime current_timer = timer + step_delay + range;
+
+    lcd.print(" T: ");
+    lcd.print(timer_min < 10 ? "0" + String(timer_min) : timer_min);
+    lcd.print(" ");
+    lcd.print(current_timer.hour());
+    lcd.print(":");
+    lcd.print(current_timer.minute());
+  } else {
+    lcd.print("                ");
   }
 }
 
@@ -180,7 +185,7 @@ static void change_light_state(bool light_on,
   TimeSpan step_delay(STEP_DELAY * 60);
   TimeSpan range(RANGE * 60);
   bool on = light_on ||
-            ((now >= (timeout_start + step_delay)) && (now < (timeout_start + step_delay + range)));
+            (timer_started && (now >= (timer + step_delay)) && (now < (timer + step_delay + range)));
 
   on &= !light_off;
 
@@ -196,7 +201,8 @@ static void change_light_state(bool light_on,
 static void handle_door(bool open_door,
                         bool close_door,
                         bool door_opened,
-                        bool door_closed)
+                        bool door_closed,
+                        int  ldr_value)
 {
   DateTime now = rtc.now();
   TimeSpan step_delay(STEP_DELAY * 60);
@@ -217,15 +223,18 @@ static void handle_door(bool open_door,
     if (!door_closed) {
       door_state = DOOR_STATE_CLOSING;
     }
-  } else if ((ldr_value > LDR_THRESHOLD) &&
-             (now >= (timeout_start + step_delay)) &&
-             (now < (timeout_start + step_delay + range)) &&
-             !door_opened) {
-    door_state = DOOR_STATE_OPENING;
-  } else if ((ldr_value < LDR_THRESHOLD) &&
-             (now >= (timeout_start + step_delay + range)) &&
-             !door_closed) {
-    door_state = DOOR_STATE_CLOSING;
+  } else if (timer_started) {
+    // Even if the ldr value is applicable we wait some extra
+    // time to activate the door
+    bool delay_applies = (now >= (timer + step_delay + range));
+
+    if ((ldr_value > LDR_THRESHOLD) &&
+        delay_applies && !door_opened) {
+      door_state = DOOR_STATE_OPENING;
+    } else if ((ldr_value <= LDR_THRESHOLD) &&
+               delay_applies && !door_closed) {
+      door_state = DOOR_STATE_CLOSING;
+    }
   }
 
   if (door_state == DOOR_STATE_OPENING) {
@@ -250,11 +259,12 @@ void loop(void)
   bool door_closed = digitalRead(DOOR_CLOSE_LIMIT_SWITCH) == HIGH;
   int ldr_value = analogRead(LDR_SENSOR);
 
-  if (door_closed || door_opened) {
-    timeout_started = false;
-  } else if (!timeout_started) {
-    timeout_started = true;
-    timeout_start = rtc.now();
+  if ((door_opened && (ldr_value > LDR_THRESHOLD)) ||
+      (door_closed && (ldr_value <= LDR_THRESHOLD))) {
+    timer_started = false;
+  } else if (!timer_started) {
+    timer_started = true;
+    timer = rtc.now();
   }
 
   print_to_lcd(light_on, light_off, open_door, door_opened, close_door, door_closed, ldr_value);
